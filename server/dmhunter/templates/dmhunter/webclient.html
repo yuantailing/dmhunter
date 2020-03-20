@@ -1,0 +1,124 @@
+{% extends "./base.html" %}
+{% load static %}
+
+{% block head %}
+<style>
+#basic-addon1, #basic-addon1:hover{
+	color: #333;
+}
+
+pre#chat-log {
+	padding: 9.5px;
+	font-size: 13px;
+	word-break: break-all;
+	word-wrap: break-word;
+	color: #333;
+	background-color: #f5f5f5;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>弹幕频道测试<span class="ml-3 text-secondary" style="font-size: 40%;">网页版</span></h1>
+
+<p class="mt-3">请输入客户端 Token</p>
+<form>
+	<div class="form-group row">
+		<div class="input-group col-sm-6" id="div-client-token">
+			<input type="text" class="form-control" id="input-client-token" placeholder="000:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" aria-label="client_token" aria-describedby="basic-addon1">
+			<div class="input-group-append">
+				<a class="input-group-text" id="basic-addon1" href=""><i class="fa fa-eye" aria-hidden="true"></i></a>
+			</div>
+		</div>
+	</div>
+	<div class="form-group row">
+		<div class="input-group col-sm-6">
+			<button type="submit" class="btn btn-primary" id="connect-btn">连接</button>
+		</div>
+	</div>
+</form>
+
+<pre id="chat-log">
+==== logging ====
+</pre>
+
+<pre>
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</pre>
+{% endblock %}
+
+{% block postscript %}
+<script>
+'use strict';
+
+$(document).ready(function () {
+	var btn = document.querySelector('#connect-btn');
+	var pre = document.querySelector('#chat-log');
+	var input = document.querySelector('#input-client-token');
+
+	function connect(mp_app_id, client_token) {
+		if (!mp_app_id || !client_token) {
+			pre.textContent += 'Bad token\n';
+			return;
+		}
+		btn.setAttribute('disabled', '');
+
+		var chatSocket = new WebSocket('wss://dmhunter.tsing.net/dmhunter/ws/chat/' + mp_app_id + '/');
+
+		chatSocket.onopen = function (e) {
+			pre.textContent += 'WebSocket OPEN\n';
+			chatSocket.send(JSON.stringify({
+				'type': 'client.version',
+				'version': '0.1.0',
+			}));
+			chatSocket.send(JSON.stringify({
+				'type': 'client.auth',
+				'client_token': client_token,
+			}));
+		};
+
+		chatSocket.onmessage = function (e) {
+			var event = JSON.parse(e.data);
+			if (event.type == 'chat.mp_msg') {
+				var mp_msg = event.mp_msg;
+				pre.textContent += (mp_msg.openid + ': ' + mp_msg.content + '\n');
+			}
+		};
+
+		chatSocket.onclose = function (e) {
+			pre.textContent += 'WebSocket CLOSED\n';
+			btn.removeAttribute('disabled');
+		};
+	}
+
+	$(btn).on('click', function (event) {
+        event.preventDefault();
+		var arr = input.value.trim().split(':');
+		var mp_app_id = arr[0];
+		var client_token = arr[1];
+		connect(mp_app_id, client_token);
+	});
+
+    $('#div-client-token a').on('click', function (event) {
+        event.preventDefault();
+        if ($('#div-client-token input').attr('type') == 'text') {
+            $('#div-client-token input').attr('type', 'password');
+            $('#div-client-token i').addClass('fa-eye-slash');
+            $('#div-client-token i').removeClass('fa-eye');
+        } else if ($('#div-client-token input').attr('type') == 'password'){
+            $('#div-client-token input').attr('type', 'text');
+            $('#div-client-token i').removeClass('fa-eye-slash');
+            $('#div-client-token i').addClass('fa-eye');
+        }
+    });
+});
+</script>
+{% endblock %}
