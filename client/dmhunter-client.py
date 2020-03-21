@@ -1,9 +1,12 @@
 import asyncio
-import atexit
 import json
 import logging
 import subprocess
 import websockets
+import pywintypes
+import win32api
+
+__version__ = '0.1.0'
 
 def show_one(text, all_proc):
     p = subprocess.Popen(['DM_Player.exe', text])
@@ -19,7 +22,7 @@ async def client(mp_app_id, token, startswith_dm, all_proc):
             async with websockets.connect(uri) as websocket:
                 await websocket.send(json.dumps({
                     'type': 'client.version',
-                    'version': '0.1.0',
+                    'version': __version__,
                 }))
                 await websocket.send(json.dumps({
                     'type': 'client.auth',
@@ -46,7 +49,8 @@ async def client(mp_app_id, token, startswith_dm, all_proc):
                         mp_msg = msg['mp_msg']
                         openid = mp_msg['openid']
                         content = mp_msg['content']
-                        logging.info(f'{openid}: {content}')
+                        content_inline = content.replace('\n', r'\n').replace('\r', r'\r')
+                        logging.info(f'{openid}: {content_inline}')
                         text = content.strip()
                         if text.upper().startswith('DM'):
                             show_one(text[2:].lstrip(), all_proc)
@@ -60,16 +64,25 @@ async def client(mp_app_id, token, startswith_dm, all_proc):
             await asyncio.sleep(10)
             logging.info('reconnect')
 
-def terminate(all_proc):
-    for p in all_proc:
-        p.terminate()
-
 if __name__ == '__main__':
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         level=logging.INFO,
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('console.log', mode='a', encoding='utf-8', delay=False),
+        ]
     )
+
     all_proc = []
+    def ctrl_handler(ctrl_type):
+        logging.info(f'dmhunter client v{__version__} exit')
+        for p in all_proc:
+            p.terminate()
+        return 0
+    logging.info(f'dmhunter client v{__version__} start')
+    win32api.SetConsoleCtrlHandler(ctrl_handler)
+
     try:
         with open('token.txt') as f:
             mp_app_id, token = f.read().strip().split(':')
@@ -80,8 +93,7 @@ if __name__ == '__main__':
     except ValueError:
         show_one('Token 格式错误', [])
         exit()
-    atexit.register(terminate, all_proc)
     try:
-        asyncio.get_event_loop().run_until_complete(client(mp_app_id, token, True, all_proc))
+        asyncio.get_event_loop().run_until_complete(client(mp_app_id, token, False, all_proc))
     except KeyboardInterrupt:
         pass
