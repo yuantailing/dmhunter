@@ -11,11 +11,11 @@ __version__ = '0.1.0'
 def show_one(text, all_proc):
     p = subprocess.Popen(['DM_Player.exe', text])
     all_proc.append(p)
-    while all_proc[0].returncode is not None:
+    while all_proc and all_proc[0].returncode is not None:
         all_proc.pop(0)
 
-async def client(mp_app_id, token, startswith_dm, all_proc):
-    uri = f'wss://dmhunter.tsing.net/dmhunter/ws/chat/{mp_app_id}/'
+async def client(app_id, token, startswith_dm, all_proc):
+    uri = f'wss://dmhunter.tsing.net/dmhunter/ws/chat/{app_id}/'
     auth_success = True
     while auth_success:
         try:
@@ -30,27 +30,32 @@ async def client(mp_app_id, token, startswith_dm, all_proc):
                 }))
                 while True:
                     json_raw = await websocket.recv()
-                    msg = json.loads(json_raw)
-                    if msg['type'] == 'server.alert':
-                        alert = msg['alert']
+                    event = json.loads(json_raw)
+                    if event['type'] == 'server.alert':
+                        alert = event['alert']
                         logging.warning(alert)
                         show_one(alert, [])
-                    elif msg['type'] == 'server.auth_result':
-                        auth_success = msg['auth_success']
+                    elif event['type'] == 'server.auth_result':
+                        auth_success = event['auth_success']
                         if auth_success:
                             logging.info('auth success')
                             show_one('已连接弹幕服务器', all_proc)
                         else:
-                            logging.warning('auth failed')
-                            show_one('Token 错误，连接失败', [])
+                            logging.warning(f'auth failed, APPID={app_id}')
+                            show_one(f'Token {app_id} 错误，连接失败', [])
                             await websocket.close()
                             break
-                    elif msg['type'] == 'chat.mp_msg':
-                        mp_msg = msg['mp_msg']
-                        openid = mp_msg['openid']
-                        content = mp_msg['content']
+                    elif event['type'] == 'chat.mp_msg' or event['type'] == 'chat.qqun_msg':
+                        if event['type'] == 'chat.mp_msg':
+                            msg = event['mp_msg']
+                            username = msg['openid']
+                            content = msg['content']
+                        else:
+                            msg = event['qqun_msg']
+                            username = f'{msg["nickname"]}({msg["user_id"]})'
+                            content = msg['message']
                         content_inline = content.replace('\n', r'\n').replace('\r', r'\r')
-                        logging.info(f'{openid}: {content_inline}')
+                        logging.info(f'{username}: {content_inline}')
                         text = content.strip()
                         if text.upper().startswith('DM'):
                             show_one(text[2:].lstrip(), all_proc)
@@ -83,10 +88,13 @@ if __name__ == '__main__':
     logging.info(f'dmhunter client v{__version__} start')
     win32api.SetConsoleCtrlHandler(ctrl_handler)
 
+    tokens = []
     try:
         with open('token.txt') as f:
-            mp_app_id, token = f.read().strip().split(':')
-            mp_app_id = int(mp_app_id)
+            for line in f:
+                app_id, token = line.strip().split(':')
+                app_id = int(app_id)
+                tokens.append((app_id, token, ))
     except FileNotFoundError:
         show_one('未找到 token.txt', [])
         exit()
@@ -94,6 +102,9 @@ if __name__ == '__main__':
         show_one('Token 格式错误', [])
         exit()
     try:
-        asyncio.get_event_loop().run_until_complete(client(mp_app_id, token, False, all_proc))
+        asyncio.get_event_loop().run_until_complete(asyncio.gather(*[
+            client(app_id, token, False, all_proc)
+            for app_id, token in tokens
+        ]))
     except KeyboardInterrupt:
         pass

@@ -1,6 +1,7 @@
 import base64
 import channels.layers
 import hashlib
+import hmac
 import json
 import random
 import socket
@@ -12,12 +13,14 @@ import xml.etree.ElementTree as ET
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.db import transaction
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
 from Crypto.Cipher import AES
+from .helpers import *
 from .models import *
 
 # Create your views here.
@@ -27,11 +30,6 @@ def index(request):
 
 def mpinstall(request):
     if request.method == 'POST':
-        def gen_token(length):
-            sigma = string.digits + string.ascii_letters
-            rd = random.SystemRandom()
-            return ''.join([rd.choice(sigma) for _ in range(length)])
-
         if settings.USE_X_FORWARDED_HOST:
             host = request.META['HTTP_X_FORWARDED_HOST']
         else:
@@ -45,6 +43,14 @@ def mpinstall(request):
         url = 'https://{:s}{:s}'.format(host, reverse('dmhunter:mpcallback', kwargs={'id': mp_app.id}))
         return render(request, 'dmhunter/mpinstall.html', {'id': mp_app.id, 'url': url, 'token': token, 'aeskey': aeskey, 'client_token': client_token})
     return render(request, 'dmhunter/mpinstall.html')
+
+def qquninstall(request):
+    if request.method == 'POST':
+        verification_code = gen_token(16)
+        client_token = gen_token(32)
+        qqun_app = QqunApp.objects.create(group_id=None, verification_code=verification_code, client_token=client_token)
+        return render(request, 'dmhunter/qquninstall.html', {'id': qqun_app.id, 'verification_code': verification_code, 'client_token': client_token})
+    return render(request, 'dmhunter/qquninstall.html')
 
 def webclient(request):
     return render(request, 'dmhunter/webclient.html')
@@ -89,7 +95,7 @@ def mpcallback(request, id):
     else:
         content = ''
     msg_id = int(et2.find('MsgId').text)
-    MpMsg.objects.create(app=mp_app, from_appid=from_appid, openid=openid, to_user_name=to_user_name, from_user_name=from_user_name, create_time=create_time, msg_type=msg_type, content=content, msg_id=msg_id)
+    MpMsg.objects.create(app=mp_app, from_appid=from_appid, openid=openid, to_user_name=to_user_name, from_user_name=from_user_name, create_time=create_time, msg_type=msg_type, content=content, msg_id=msg_id, xml_content=xml_content)
     assert openid == from_user_name
 
     channel_layer = channels.layers.get_channel_layer()
@@ -154,3 +160,56 @@ def mpcallback(request, id):
         return HttpResponse(text)
     else:
         return HttpResponse('success')
+
+@csrf_exempt
+def cqhttpcallback(request):
+    if request.method == 'POST':
+        sig = hmac.new(settings.CQHTTP_SECRET, request.body, 'sha1').hexdigest()
+        sig_recv = request.headers.get('X-Signature')
+        if sig_recv is None or sig_recv[len('sha1='):] != sig:
+            return HttpResponseBadRequest()
+        data = json.loads(request.body.decode('utf-8'))
+        if data['post_type'] == 'request':
+            return JsonResponse({'approve': True})
+        if data['post_type'] == 'message' and data['message_type'] == 'group':
+            message = data['message']
+            qqun_app = QqunApp.objects.filter(verification_code=message, group_id__isnull=True)
+            if qqun_app:
+                with transaction.atomic():
+                    QqunApp.objects.filter(group_id=data['group_id']).delete()
+                    qqun_app.update(group_id=data['group_id'])
+                return JsonResponse({'reply': '弹幕绑定成功'})
+            qqun_app = QqunApp.objects.filter(group_id=data['group_id']).first()
+            if qqun_app:
+                qqun_message = QqunMsg.objects.create(
+                    app=qqun_app,
+                    group_id=data['group_id'],
+                    time=data['time'],
+                    self_id=data['self_id'],
+                    sub_type=data['sub_type'],
+                    message_id=data['message_id'],
+                    user_id=data['user_id'],
+                    message=data['message'],
+                    sender_nickname=data['sender'].get('nickname'),
+                    sender_card=data['sender'].get('card'),
+                    body=request.body,
+                )
+                channel_layer = channels.layers.get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    'dmhunter_chat_{:d}'.format(qqun_app.id),
+                    {
+                        'type': 'broadcast',
+                        'message': {
+                            'type': 'chat.qqun_msg',
+                            'qqun_msg': {
+                                'sub_type': data['sub_type'],
+                                'user_id': data['user_id'],
+                                'nickname': data['sender'].get('nickname'),
+                                'card': data['sender'].get('card'),
+                                'message': message,
+                            },
+                        },
+                    }
+                )
+        return HttpResponse()
+    return HttpResponseBadRequest()

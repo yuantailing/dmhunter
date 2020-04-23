@@ -1,0 +1,41 @@
+{% extends "./base.html" %}
+{% load static %}
+
+{% block content %}
+<h1>QQ 接入</h1>
+
+<p>请按以下指引接入 DM Hunter。</p>
+<ol>
+	<li><p>添加 QQ 号 123456789（昵称 DM-robot）为好友，并将其加进 QQ 群。</p></li>
+	<li><p>在群内发送验证码，DM-robot 自动回复“绑定成功”。</p></li>
+	<ul>
+		<li><label style="width: 12em;">验证码</label>{% if verification_code %}<code>{{ verification_code }}</code>{% else %}<img src="{% static 'dmhunter/img/wait16.gif' %}"> 等待获取{% endif %}</li>
+	</ul>
+	<li><p>将以下 Token 填在弹幕客户端中。</p></li>
+	<ul>
+		<li><label style="width: 12em;">弹幕客户端 Token</label>{% if id and client_token %}<code>{{id}}:{{ client_token }}</code>{% else %}<img src="{% static 'dmhunter/img/wait16.gif' %}"> 等待获取{% endif %}<span class="text-danger ml-4">持有该 Token 的任何人会获得该 QQ 群的所有消息以便弹幕显示</span></li>
+	</ul>
+</ol>
+
+<form method="POST">
+	{% csrf_token %}
+	<p><input type="submit" {% if client_token %}class="btn btn-primary" value="获取 Tokens" disabled{% else %}class="btn btn-primary" value="获取 Tokens"{% endif %}></p>
+</forM>
+<p>注意事项</p>
+<ol>
+	<li>以上所有验证码、Token 只会显示一次。如果遗忘了任何一项，只能重新接入。</li>
+	<li>如果同一个群重复接入，则只有最后一次接入的生效。</li>
+	<li>持有弹幕客户端 Token 的任何人会获得该 QQ 群的所有消息以便弹幕显示。</li>
+</ol>
+
+<pre>
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</pre>
+
+{% endblock %}

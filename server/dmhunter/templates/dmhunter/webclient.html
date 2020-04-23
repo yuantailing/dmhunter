@@ -71,7 +71,7 @@ $(document).ready(function () {
 		}
 		btn.setAttribute('disabled', '');
 
-		var chatSocket = new WebSocket('wss://dmhunter.tsing.net/dmhunter/ws/chat/' + mp_app_id + '/');
+		var chatSocket = new WebSocket(location.protocol.replace('http', 'ws') + '//' + location.host + '/dmhunter/ws/chat/' + mp_app_id + '/');
 
 		chatSocket.onopen = function (e) {
 			pre.textContent += 'WebSocket OPEN\n';
@@ -90,6 +90,9 @@ $(document).ready(function () {
 			if (event.type == 'chat.mp_msg') {
 				var mp_msg = event.mp_msg;
 				pre.textContent += (mp_msg.openid + ': ' + mp_msg.content + '\n');
+			} else if (event.type == 'chat.qqun_msg') {
+				var qqun_msg = event.qqun_msg;
+				pre.textContent += ((qqun_msg.nickname || qqun_msg.card) + '(' + qqun_msg.user_id + '): ' + qqun_msg.message + '\n');
 			}
 		};
 

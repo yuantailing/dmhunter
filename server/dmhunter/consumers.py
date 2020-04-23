@@ -3,13 +3,13 @@ import json
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 
-from .models import MpApp
+from .models import App
 
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
-        self.mp_app_id = self.scope['url_route']['kwargs']['id']
-        self.room_group_name = 'dmhunter_chat_{:d}'.format(self.mp_app_id)
+        self.app_id = self.scope['url_route']['kwargs']['id']
+        self.room_group_name = 'dmhunter_chat_{:d}'.format(self.app_id)
         self.accept()
 
     def disconnect(self, close_code):
@@ -31,8 +31,8 @@ class ChatConsumer(WebsocketConsumer):
                 }))
         elif data['type'] == 'client.auth':
             assert isinstance(self.client_version, str)
-            mp_app = MpApp.objects.filter(id=self.mp_app_id).first()
-            auth_success = bool(mp_app and data['client_token'] == mp_app.client_token)
+            app = App.objects.filter(id=self.app_id).first()
+            auth_success = bool(app and data['client_token'] == app.client_token)
             self.send(text_data=json.dumps({
                 'type': 'server.auth_result',
                 'auth_success': auth_success,
