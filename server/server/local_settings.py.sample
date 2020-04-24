@@ -1,0 +1,14 @@
+SECRET_KEY = 'SECRET_KEY'
+ALLOWED_HOSTS = ['dmhunter.tsing.net']
+USE_X_FORWARDED_HOST = False
+QQ_DMROBOT = 123456789
+CQHTTP_SECRET = b'CQHTTP_SECRET'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 16379)],
+        },
+    },
+}

@@ -49,8 +49,8 @@ def qquninstall(request):
         verification_code = gen_token(16)
         client_token = gen_token(32)
         qqun_app = QqunApp.objects.create(group_id=None, verification_code=verification_code, client_token=client_token)
-        return render(request, 'dmhunter/qquninstall.html', {'id': qqun_app.id, 'verification_code': verification_code, 'client_token': client_token})
-    return render(request, 'dmhunter/qquninstall.html')
+        return render(request, 'dmhunter/qquninstall.html', {'qq_dmrobot': settings.QQ_DMROBOT, 'id': qqun_app.id, 'verification_code': verification_code, 'client_token': client_token})
+    return render(request, 'dmhunter/qquninstall.html', {'qq_dmrobot': settings.QQ_DMROBOT})
 
 def webclient(request):
     return render(request, 'dmhunter/webclient.html')
@@ -192,7 +192,7 @@ def cqhttpcallback(request):
                     message=data['message'],
                     sender_nickname=data['sender'].get('nickname'),
                     sender_card=data['sender'].get('card'),
-                    body=request.body,
+                    body=request.body.decode('utf-8'),
                 )
                 channel_layer = channels.layers.get_channel_layer()
                 async_to_sync(channel_layer.group_send)(

@@ -6,8 +6,8 @@
 
 <p>请按以下指引接入 DM Hunter。</p>
 <ol>
-	<li><p>添加 QQ 号 123456789（昵称 DM-robot）为好友，并将其加进 QQ 群。</p></li>
-	<li><p>在群内发送验证码，DM-robot 自动回复“绑定成功”。</p></li>
+	<li><p>添加 QQ 号 {{ qq_dmrobot }}（昵称 DM-robot）为好友，将其加进 QQ 群。</p></li>
+	<li><p>在群内发送验证码，DM-robot 自动回复“弹幕绑定成功”。</p></li>
 	<ul>
 		<li><label style="width: 12em;">验证码</label>{% if verification_code %}<code>{{ verification_code }}</code>{% else %}<img src="{% static 'dmhunter/img/wait16.gif' %}"> 等待获取{% endif %}</li>
 	</ul>

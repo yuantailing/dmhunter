@@ -6,7 +6,7 @@ import websockets
 import pywintypes
 import win32api
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 def show_one(text, all_proc):
     p = subprocess.Popen(['DM_Player.exe', text])
@@ -14,10 +14,10 @@ def show_one(text, all_proc):
     while all_proc and all_proc[0].returncode is not None:
         all_proc.pop(0)
 
-async def client(app_id, token, startswith_dm, all_proc):
-    uri = f'wss://dmhunter.tsing.net/dmhunter/ws/chat/{app_id}/'
-    auth_success = True
-    while auth_success:
+async def client(apps, startswith_dm, all_proc):
+    uri = f'wss://dmhunter.tsing.net/dmhunter/ws/chat/'
+    subscribe_success = True
+    while subscribe_success:
         try:
             async with websockets.connect(uri) as websocket:
                 await websocket.send(json.dumps({
@@ -25,8 +25,8 @@ async def client(app_id, token, startswith_dm, all_proc):
                     'version': __version__,
                 }))
                 await websocket.send(json.dumps({
-                    'type': 'client.auth',
-                    'client_token': token,
+                    'type': 'client.subscribe',
+                    'apps': [{'app_id': token['app_id'], 'client_token': token['token']} for token in apps],
                 }))
                 while True:
                     json_raw = await websocket.recv()
@@ -35,14 +35,16 @@ async def client(app_id, token, startswith_dm, all_proc):
                         alert = event['alert']
                         logging.warning(alert)
                         show_one(alert, [])
-                    elif event['type'] == 'server.auth_result':
-                        auth_success = event['auth_success']
-                        if auth_success:
-                            logging.info('auth success')
+                    elif event['type'] == 'server.subscribe_result':
+                        subscribe_success = event['success']
+                        if subscribe_success:
+                            logging.info('subscribe success')
                             show_one('已连接弹幕服务器', all_proc)
                         else:
-                            logging.warning(f'auth failed, APPID={app_id}')
-                            show_one(f'Token {app_id} 错误，连接失败', [])
+                            app_ids = [app['app_id'] for app in event['failed_apps']]
+                            logging.warning(f'subscribe failed, failed_apps={app_ids!r}')
+                            s = ', '.join([str(x) for x in app_ids])
+                            show_one(f'Token {s} 错误，连接失败', [])
                             await websocket.close()
                             break
                     elif event['type'] == 'chat.mp_msg' or event['type'] == 'chat.qqun_msg':
@@ -88,23 +90,24 @@ if __name__ == '__main__':
     logging.info(f'dmhunter client v{__version__} start')
     win32api.SetConsoleCtrlHandler(ctrl_handler)
 
-    tokens = []
+    apps = []
     try:
         with open('token.txt') as f:
             for line in f:
                 app_id, token = line.strip().split(':')
                 app_id = int(app_id)
-                tokens.append((app_id, token, ))
+                apps.append({'app_id': app_id, 'token': token})
     except FileNotFoundError:
+        logging.error(f'token.txt not found')
         show_one('未找到 token.txt', [])
         exit()
     except ValueError:
+        logging.error(f'token parsing error')
         show_one('Token 格式错误', [])
         exit()
     try:
-        asyncio.get_event_loop().run_until_complete(asyncio.gather(*[
-            client(app_id, token, False, all_proc)
-            for app_id, token in tokens
-        ]))
+        asyncio.get_event_loop().run_until_complete(
+            client(apps, False, all_proc)
+        )
     except KeyboardInterrupt:
         pass
