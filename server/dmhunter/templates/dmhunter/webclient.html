@@ -71,17 +71,17 @@ $(document).ready(function () {
 		}
 		btn.setAttribute('disabled', '');
 
-		var chatSocket = new WebSocket(location.protocol.replace('http', 'ws') + '//' + location.host + '/dmhunter/ws/chat/' + mp_app_id + '/');
+		var chatSocket = new WebSocket(location.protocol.replace('http', 'ws') + '//' + location.host + '/dmhunter/ws/chat/');
 
 		chatSocket.onopen = function (e) {
 			pre.textContent += 'WebSocket OPEN\n';
 			chatSocket.send(JSON.stringify({
 				'type': 'client.version',
-				'version': '0.1.0',
+				'version': '0.2.0',
 			}));
 			chatSocket.send(JSON.stringify({
-				'type': 'client.auth',
-				'client_token': client_token,
+				'type': 'client.subscribe',
+				'apps': [{'app_id': mp_app_id, 'client_token': client_token}],
 			}));
 		};
 
@@ -92,7 +92,7 @@ $(document).ready(function () {
 				pre.textContent += (mp_msg.openid + ': ' + mp_msg.content + '\n');
 			} else if (event.type == 'chat.qqun_msg') {
 				var qqun_msg = event.qqun_msg;
-				pre.textContent += ((qqun_msg.nickname || qqun_msg.card) + '(' + qqun_msg.user_id + '): ' + qqun_msg.message + '\n');
+				pre.textContent += ((qqun_msg.card || qqun_msg.nickname) + '(' + qqun_msg.user_id + '): ' + qqun_msg.message + '\n');
 			}
 		};
 
@@ -105,7 +105,7 @@ $(document).ready(function () {
 	$(btn).on('click', function (event) {
         event.preventDefault();
 		var arr = input.value.trim().split(':');
-		var mp_app_id = arr[0];
+		var mp_app_id = parseInt(arr[0]);
 		var client_token = arr[1];
 		connect(mp_app_id, client_token);
 	});

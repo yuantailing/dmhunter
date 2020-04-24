@@ -48,7 +48,13 @@ class ChatConsumer(WebsocketConsumer):
                 'success': not failed_apps,
                 'failed_apps': failed_apps,
             }))
+            if failed_apps:
+                self.close()
         else:
+            self.send(text_data=json.dumps({
+                'type': 'server.warning',
+                'warning': 'unknown event type',
+            }))
             self.close()
 
     # Receive message from room group
