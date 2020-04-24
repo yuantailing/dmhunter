@@ -54,7 +54,7 @@ async def client(apps, startswith_dm, all_proc):
                             content = msg['content']
                         else:
                             msg = event['qqun_msg']
-                            username = f'{msg["nickname"]}({msg["user_id"]})'
+                            username = f'{msg["card"] or msg["nickname"]}({msg["user_id"]})'
                             content = msg['message']
                         content_inline = content.replace('\n', r'\n').replace('\r', r'\r')
                         logging.info(f'{username}: {content_inline}')
@@ -92,14 +92,16 @@ if __name__ == '__main__':
 
     apps = []
     try:
-        with open('token.txt') as f:
+        with open('tokens.txt', encoding='latin1') as f:
             for line in f:
-                app_id, token = line.strip().split(':')
+                s = line.lstrip('\xef\xbb\xbf')
+                s = s.split('#')[0].strip()
+                app_id, token = s.split(':')
                 app_id = int(app_id)
                 apps.append({'app_id': app_id, 'token': token})
     except FileNotFoundError:
-        logging.error(f'token.txt not found')
-        show_one('未找到 token.txt', [])
+        logging.error(f'tokens.txt not found')
+        show_one('未找到 tokens.txt', [])
         exit()
     except ValueError:
         logging.error(f'token parsing error')

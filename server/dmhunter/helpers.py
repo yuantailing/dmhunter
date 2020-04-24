@@ -2,8 +2,18 @@ import random
 import re
 import string
 
+_cq_sub = [
+    (re.compile(r'\[CQ\:image,[^\]]*\]'), '[图片]'),
+    (re.compile(r'\[CQ\:record,[^\]]*\]'), '[语音]'),
+    (re.compile(r'\[CQ\:contact,[^\]]*\]'), '[名片]'),
+    (re.compile(r'\[CQ\:at,qq=(\d+)\]'), lambda m: f'@{m.group(1)} '),
+    (re.compile(r'\[CQ\:[^\]]*\]'), '[特殊消息]'),
+]
+
 def friendly_message(message):
-    return re.sub(r'\[CQ\:image,[^\]]*\]', '[图片]', message)
+    for pattern, target in _cq_sub:
+        message = pattern.sub(target, message)
+    return message
 
 def gen_token(length):
     sigma = string.digits + string.ascii_letters

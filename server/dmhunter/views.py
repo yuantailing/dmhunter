@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import random
+import re
 import socket
 import string
 import struct
@@ -206,7 +207,7 @@ def cqhttpcallback(request):
                                 'user_id': data['user_id'],
                                 'nickname': data['sender'].get('nickname'),
                                 'card': data['sender'].get('card'),
-                                'message': message,
+                                'message': friendly_message(re.sub('\[CQ:[bf]?face,id=\d+\]', '[表情]', message)),
                             },
                         },
                     }
