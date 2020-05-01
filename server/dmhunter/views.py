@@ -170,7 +170,7 @@ def cqhttpcallback(request):
         if sig_recv is None or sig_recv[len('sha1='):] != sig:
             return HttpResponseBadRequest()
         data = json.loads(request.body.decode('utf-8'))
-        if data['post_type'] == 'request':
+        if data['post_type'] == 'request' and data.get('sub_type') != 'add':
             return JsonResponse({'approve': True})
         if data['post_type'] == 'message' and data['message_type'] == 'group':
             message = data['message']
@@ -207,7 +207,7 @@ def cqhttpcallback(request):
                                 'user_id': data['user_id'],
                                 'nickname': data['sender'].get('nickname'),
                                 'card': data['sender'].get('card'),
-                                'message': friendly_message(re.sub('\[CQ:[bf]?face,id=\d+\]', '[表情]', message)),
+                                'message': friendly_message(message),
                             },
                         },
                     }
