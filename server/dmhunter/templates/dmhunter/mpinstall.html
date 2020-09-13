@@ -16,13 +16,8 @@
 	</ul>
 	<p>只要能成功保存就说明以上信息填写正确。</p>
 	<li>
-		<p>点击“启用”；从启用到生效可能有 5 分钟延迟。</p>
-		<p>启用后，订阅号原本的自动回复会失效。向该订阅号发送 <span class="text-success">DM内容</span> 测试，如有回复 <span class="text-success">弹幕发射~升空</span> 则说明接入成功。</p>
+		<p>点击“启用”。启用后，订阅号原本的自动回复会失效。</p>
 	</li>
-	<li><p>将以下 Token 填在弹幕客户端中。</p></li>
-	<ul>
-		<li><label style="width: 12em;">弹幕客户端 Token</label>{% if id and client_token %}<code>{{id}}:{{ client_token }}</code>{% else %}<img src="{% static 'dmhunter/img/wait16.gif' %}"> 等待获取{% endif %}<span class="text-danger ml-4">持有该 Token 的任何人会获得该公众号收到的所有消息以便弹幕显示</span></li>
-	</ul>
 </ol>
 
 <form method="POST">
@@ -31,9 +26,8 @@
 </forM>
 <p>注意事项</p>
 <ol>
-	<li>以上所有 Token、URL、密钥只会显示一次。如果遗忘了任何一项，只能重新接入（重做第 2 ~ 4 步）。</li>
+	<li>以上所有 Token、URL、密钥只会显示一次。如果遗忘了任何一项，只能重新接入（重做第 2 ~ 3 步）。</li>
 	<li>严禁泄露微信公众平台服务器配置的 Token 和密钥。</li>
-	<li>持有弹幕客户端 Token 的任何人会获得该公众号收到的所有消息以便弹幕显示。</li>
 </ol>
 
 <pre>

@@ -35,14 +35,12 @@ def mpinstall(request):
             host = request.META['HTTP_X_FORWARDED_HOST']
         else:
             host = request.META['HTTP_HOST']
-        if host != 'dmhunter.tsing.net':
-            return HttpResponseBadRequest('请使用域名 dmhunter.tsing.net 访问本网站')
         token = gen_token(32)
         aeskey = gen_token(43)
-        client_token = gen_token(32)
-        mp_app = MpApp.objects.create(token=token, aeskey=aeskey, client_token=client_token)
-        url = 'https://{:s}{:s}'.format(host, reverse('dmhunter:mpcallback', kwargs={'id': mp_app.id}))
-        return render(request, 'dmhunter/mpinstall.html', {'id': mp_app.id, 'url': url, 'token': token, 'aeskey': aeskey, 'client_token': client_token})
+        with transaction.atomic():
+            connector = Connector.objects.create(token=token, aeskey=aeskey)
+            url = 'https://{:s}{:s}'.format(host, reverse('dmhunter:mpcallback', kwargs={'id': connector.id}))
+            return render(request, 'dmhunter/mpinstall.html', {'id': connector.id, 'url': url, 'token': token, 'aeskey': aeskey})
     return render(request, 'dmhunter/mpinstall.html')
 
 def qquninstall(request):
@@ -58,9 +56,9 @@ def webclient(request):
 
 @csrf_exempt
 def mpcallback(request, id):
-    mp_app = get_object_or_404(MpApp.objects, id=id)
-    token = mp_app.token
-    aeskey = mp_app.aeskey
+    connector = get_object_or_404(Connector.objects, id=id)
+    token = connector.token
+    aeskey = connector.aeskey
 
     signature = request.GET.get('signature', '')
     timestamp = request.GET.get('timestamp', '')
@@ -96,26 +94,97 @@ def mpcallback(request, id):
     else:
         content = ''
     msg_id = int(et2.find('MsgId').text)
-    MpMsg.objects.create(app=mp_app, from_appid=from_appid, openid=openid, to_user_name=to_user_name, from_user_name=from_user_name, create_time=create_time, msg_type=msg_type, content=content, msg_id=msg_id, xml_content=xml_content)
     assert openid == from_user_name
 
-    channel_layer = channels.layers.get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        'dmhunter_chat_{:d}'.format(mp_app.id),
-        {
-            'type': 'broadcast',
-            'message': {
-                'type': 'chat.mp_msg',
-                'mp_msg': {
-                    'openid': openid,
-                    'msg_type': msg_type,
-                    'content': content,
-                },
-            },
-        }
-    )
+    with transaction.atomic():
+        gh_obj, _ = Gh.objects.get_or_create(appid=from_appid, defaults={'user_name': to_user_name})
+        openid_obj, _ = Openid.objects.get_or_create(openid=openid, defaults={'gh': gh_obj})
+        message_obj = Message.objects.create(openid=openid_obj, gh=gh_obj, from_appid=from_appid, to_user_name=to_user_name, from_user_name=from_user_name, create_time=create_time, msg_type=msg_type, content=content, msg_id=msg_id, xml_content=xml_content)
+    assert openid_obj.gh == gh_obj
 
-    if content.lstrip().upper().startswith('DM'):
+    reply = None
+
+    if content.startswith('@'):
+        m1 = re.match('@register\s*=', content)
+        m2 = re.match('@class\s*=', content)
+        m3 = re.match('@gettoken\s*=', content)
+        if m1:
+            name = content[len(m1.group(0)):].strip()
+            regular_name = Group.regularize(name)
+            if regular_name:
+                if Group.objects.filter(gh=gh_obj, regular_name=regular_name).exists():
+                    reply = '注册失败：名称被占用'
+                else:
+                    with transaction.atomic():
+                        subscription = Subscription.objects.create(token=gen_token(16))
+                        Group.objects.create(gh=gh_obj, name=name, regular_name=regular_name, owner=openid_obj, subscription=subscription)
+                    reply = f'成功注册新频道 {name}'
+            else:
+                reply = '注册失败：名称应使用字母、数字、空格、减号、下划线、小数点'
+        elif m2:
+            name = content[len(m2.group(0)):].strip()
+            if not name:
+                openid_obj.joined_group = None
+                openid_obj.save()
+                reply = '已退出频道'
+            else:
+                regular_name = Group.regularize(name)
+                if regular_name:
+                    group = Group.objects.filter(gh=gh_obj, regular_name=regular_name).first()
+                    if group:
+                        openid_obj.joined_group = group
+                        openid_obj.save()
+                        reply = f'成功加入频道 {group.name}'
+                        if name != group.name:
+                            reply += '（不区分大小写）'
+                    else:
+                        reply = '加入失败：频道不存在'
+                else:
+                    reply = '加入失败：频道名称格式错误'
+        elif m3:
+            name = content[len(m3.group(0)):].strip()
+            regular_name = Group.regularize(name)
+            if regular_name:
+                group = Group.objects.filter(gh=gh_obj, regular_name=regular_name).first()
+                if group.owner == openid_obj:
+                    reply = f'{group.subscription.id}:{group.subscription.token}'
+                else:
+                    reply = '获取 token 失败：权限错误'
+            else:
+                reply = '获取 token 失败：频道名称错误'
+        elif content.strip() == '@class':
+            group = openid_obj.joined_group
+            if openid_obj.joined_group:
+                reply = f'当前弹幕频道为 {openid_obj.joined_group.name}'
+            else:
+                reply = '未加入弹幕频道'
+        else:
+            reply = '指令错误'
+    elif content:
+        if openid_obj.joined_group:
+            message_obj.group = openid_obj.joined_group
+            message_obj.save()
+
+            channel_layer = channels.layers.get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'dmhunter_chat_{:d}'.format(openid_obj.joined_group.subscription.id),
+                {
+                    'type': 'broadcast',
+                    'message': {
+                        'type': 'chat.mp_msg',
+                        'mp_msg': {
+                            'openid': openid,
+                            'msg_type': msg_type,
+                            'content': content,
+                        },
+                    },
+                }
+            )
+            reply = '弹幕发射~升空！'
+        else:
+            reply = '未加入弹幕频道'
+
+    if reply:
         xml = ET.Element('xml')
         timestamp = int(time.time())
         child = ET.SubElement(xml, 'ToUserName')
@@ -127,13 +196,8 @@ def mpcallback(request, id):
         child = ET.SubElement(xml, 'MsgType')
         child.text = 'text'
         child = ET.SubElement(xml, 'Content')
-        child.text = '弹幕发射~升空！'
+        child.text = reply
         text = ET.tostring(xml, encoding='utf-8')
-
-        def gen_token(length):
-            sigma = string.digits + string.ascii_letters
-            rd = random.SystemRandom()
-            return ''.join([rd.choice(sigma) for _ in range(length)])
 
         text = gen_token(16).encode() + struct.pack('I', socket.htonl(len(text))) + text + from_appid.encode()
         text_length = len(text)

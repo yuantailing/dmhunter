@@ -3,7 +3,7 @@ import json
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 
-from .models import App
+from .models import Subscription
 
 
 class ChatConsumer(WebsocketConsumer):
@@ -33,8 +33,8 @@ class ChatConsumer(WebsocketConsumer):
             assert isinstance(self.client_version, str)
             failed_apps = []
             for o in data['apps']:
-                app = App.objects.filter(id=o['app_id']).first()
-                if not app or o['client_token'] != app.client_token:
+                app = Subscription.objects.filter(id=o['app_id']).first()
+                if not app or o['client_token'] != app.token:
                     failed_apps.append({'app_id': app.id})
                 else:
                     room_group_name = 'dmhunter_chat_{:d}'.format(app.id)
@@ -88,8 +88,8 @@ class ChatConsumer_0_1_0(WebsocketConsumer):
                 }))
         elif data['type'] == 'client.auth':
             assert isinstance(self.client_version, str)
-            app = App.objects.filter(id=self.app_id).first()
-            auth_success = bool(app and data['client_token'] == app.client_token)
+            app = Subscription.objects.filter(id=self.app_id).first()
+            auth_success = bool(app and data['client_token'] == app.token)
             self.send(text_data=json.dumps({
                 'type': 'server.auth_result',
                 'auth_success': auth_success,
