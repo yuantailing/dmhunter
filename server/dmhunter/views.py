@@ -93,7 +93,11 @@ def mpcallback(request, id):
         content = content.text
     else:
         content = ''
-    msg_id = int(et2.find('MsgId').text)
+    msg_id = et2.find('MsgId')
+    if msg_id is not None:
+        msg_id = int(msg_id.text)
+    else:
+        msg_id = 0
     assert openid == from_user_name
 
     with transaction.atomic():

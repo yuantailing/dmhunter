@@ -63,7 +63,7 @@ class Message(models.Model):
     create_time = models.BigIntegerField()
     msg_type = models.CharField(max_length=64, db_index=True, default=None)
     content = models.TextField()
-    msg_id = models.BigIntegerField(unique=True)
+    msg_id = models.BigIntegerField()
     xml_content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
