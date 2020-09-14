@@ -104,9 +104,9 @@ def mpcallback(request, id):
 
     reply = None
 
-    if content.startswith('@'):
+    if content.lstrip().startswith('@'):
         m1 = re.match('@register\s*=', content)
-        m2 = re.match('@class\s*=', content)
+        m2 = re.match('\s*@class\s*[=＝]', content)
         m3 = re.match('@gettoken\s*=', content)
         if m1:
             name = content[len(m1.group(0)):].strip()
