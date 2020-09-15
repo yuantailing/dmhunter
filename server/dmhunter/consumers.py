@@ -35,7 +35,7 @@ class ChatConsumer(WebsocketConsumer):
             for o in data['apps']:
                 app = Subscription.objects.filter(id=o['app_id']).first()
                 if not app or o['client_token'] != app.token:
-                    failed_apps.append({'app_id': app.id})
+                    failed_apps.append({'app_id': o['app_id']})
                 else:
                     room_group_name = 'dmhunter_chat_{:d}'.format(app.id)
                     if room_group_name not in self.groups:
