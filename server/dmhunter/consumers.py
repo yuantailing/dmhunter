@@ -24,7 +24,7 @@ class ChatConsumer(WebsocketConsumer):
         data = json.loads(text_data)
         if data['type'] == 'client.version':
             self.client_version = data['version']
-            if self.client_version != '0.2.0':
+            if self.client_version != '0.2.1':
                 self.send(text_data=json.dumps({
                     'type': 'server.alert',
                     'alert': '弹幕客户端有更新，见 https://dmhunter.tsing.net/',

@@ -21,6 +21,7 @@ class Gh(models.Model):
 class Openid(models.Model):
     openid = models.CharField(max_length=64, unique=True, default=None)
     gh = models.ForeignKey(Gh, on_delete=models.PROTECT)
+    user_filled_id = models.CharField(max_length=64, blank=True, default='')
     joined_group = models.ForeignKey('Group', null=True, blank=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -65,5 +66,6 @@ class Message(models.Model):
     content = models.TextField()
     msg_id = models.BigIntegerField()
     xml_content = models.TextField()
+    reply = models.TextField(null=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

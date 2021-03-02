@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -110,7 +110,7 @@ def mpcallback(request, id):
 
     if content.lstrip().startswith('@'):
         m1 = re.match('@register\s*=', content)
-        m2 = re.match('\s*@class\s*[=＝]', content)
+        m2 = re.match('\s*@(class|id)\s*[=＝]', content.lower())
         m3 = re.match('@gettoken\s*=', content)
         if m1:
             name = content[len(m1.group(0)):].strip()
@@ -126,25 +126,41 @@ def mpcallback(request, id):
             else:
                 reply = '注册失败：名称应使用字母、数字、空格、减号、下划线、小数点'
         elif m2:
+            action = m2.group(1).lower()
             name = content[len(m2.group(0)):].strip()
-            if not name:
-                openid_obj.joined_group = None
-                openid_obj.save()
-                reply = '已退出频道'
-            else:
-                regular_name = Group.regularize(name)
-                if regular_name:
-                    group = Group.objects.filter(gh=gh_obj, regular_name=regular_name).first()
-                    if group:
-                        openid_obj.joined_group = group
-                        openid_obj.save()
-                        reply = f'成功加入频道 {group.name}'
-                        if name != group.name:
-                            reply += '（不区分大小写）'
-                    else:
-                        reply = '加入失败：频道不存在'
+            if action == 'class':
+                if not name:
+                    openid_obj.joined_group = None
+                    openid_obj.save()
+                    reply = '已退出频道'
                 else:
-                    reply = '加入失败：频道名称格式错误'
+                    regular_name = Group.regularize(name)
+                    if regular_name:
+                        group = Group.objects.filter(gh=gh_obj, regular_name=regular_name).first()
+                        if group:
+                            openid_obj.joined_group = group
+                            openid_obj.save()
+                            reply = f'成功加入频道 {group.name}'
+                            if name != group.name:
+                                reply += '（不区分大小写）'
+                        else:
+                            reply = '加入失败：频道不存在'
+                    else:
+                        reply = '加入失败：频道名称格式错误'
+            else:  # action == 'id'
+                is_charset_valid = all(c in string.digits + string.ascii_letters for c in name)
+                if not is_charset_valid:
+                    reply = 'ID 格式错误，只允许字母数字'
+                elif len(name) > 18:
+                    reply = 'ID 过长'
+                else:
+                    if name:
+                        reply = '更新 ID 成功'
+                    else:
+                        reply = '删除 ID 成功'
+                    openid_obj.user_filled_id = name
+                    openid_obj.full_clean()
+                    openid_obj.save()
         elif m3:
             name = content[len(m3.group(0)):].strip()
             regular_name = Group.regularize(name)
@@ -166,9 +182,7 @@ def mpcallback(request, id):
             reply = '指令错误'
     elif content:
         if openid_obj.joined_group:
-            message_obj.group = openid_obj.joined_group
-            message_obj.save()
-
+            message_obj.group = openid_obj.joined_group  # delayed save. save with reply at the same time
             channel_layer = channels.layers.get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 'dmhunter_chat_{:d}'.format(openid_obj.joined_group.subscription.id),
@@ -178,6 +192,7 @@ def mpcallback(request, id):
                         'type': 'chat.mp_msg',
                         'mp_msg': {
                             'openid': openid,
+                            'user_filled_id': openid_obj.user_filled_id,
                             'msg_type': msg_type,
                             'content': content,
                         },
@@ -187,6 +202,10 @@ def mpcallback(request, id):
             reply = '弹幕发射~升空！'
         else:
             reply = '未加入弹幕频道'
+
+    if reply:
+        message_obj.reply=reply
+        message_obj.save()
 
     if reply:
         xml = ET.Element('xml')
