@@ -77,7 +77,7 @@ $(document).ready(function () {
 			pre.textContent += 'WebSocket OPEN\n';
 			chatSocket.send(JSON.stringify({
 				'type': 'client.version',
-				'version': '0.2.0',
+				'version': '0.2.1',
 			}));
 			chatSocket.send(JSON.stringify({
 				'type': 'client.subscribe',
@@ -87,9 +87,14 @@ $(document).ready(function () {
 
 		chatSocket.onmessage = function (e) {
 			var event = JSON.parse(e.data);
-			if (event.type == 'chat.mp_msg') {
+			if (event.type == 'server.alert') {
+				pre.textContent += ('server.alert: ' + event.alert + '\n');
+			} else if (event.type == 'chat.mp_msg') {
 				var mp_msg = event.mp_msg;
-				pre.textContent += (mp_msg.openid + ': ' + mp_msg.content + '\n');
+				var username = mp_msg.openid;
+				if (mp_msg.user_filled_id)
+					username += '(' + mp_msg.user_filled_id + ')';
+				pre.textContent += (username + ': ' + mp_msg.content + '\n');
 			} else if (event.type == 'chat.qqun_msg') {
 				var qqun_msg = event.qqun_msg;
 				pre.textContent += ((qqun_msg.card || qqun_msg.nickname) + '(' + qqun_msg.user_id + '): ' + qqun_msg.message + '\n');
