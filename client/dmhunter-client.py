@@ -1,18 +1,27 @@
 import asyncio
 import json
 import logging
+import os
+import pywintypes
+import re
 import subprocess
 import websockets
-import pywintypes
 import win32api
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
+
+
+def multiple_replace(dict, text):
+    pattern = re.compile("|".join(map(re.escape, dict.keys())))
+    return pattern.sub(lambda mo: dict[mo.group(0)], text)
+
 
 def show_one(text, all_proc):
     p = subprocess.Popen(['DM_Player.exe', text])
     all_proc.append(p)
     while all_proc and all_proc[0].returncode is not None:
         all_proc.pop(0)
+
 
 async def client(apps, startswith_dm, all_proc):
     uri = f'wss://dmhunter.tsing.net/dmhunter/ws/chat/'
@@ -49,16 +58,26 @@ async def client(apps, startswith_dm, all_proc):
                             break
                     elif event['type'] == 'chat.mp_msg' or event['type'] == 'chat.qqun_msg':
                         if event['type'] == 'chat.mp_msg':
+                            template = templates[1]
                             msg = event['mp_msg']
                             username = msg['openid']
+                            if msg['user_filled_id']:
+                                username += f'({msg["user_filled_id"]})'
+                                template = templates[0]
                             content = msg['content']
+                            text = multiple_replace({
+                                    '{openid}': msg['openid'],
+                                    '{id}': msg['user_filled_id'].strip(),
+                                    '{content}': content.strip(),
+                                }, template)
                         else:
                             msg = event['qqun_msg']
                             username = f'{msg["card"] or msg["nickname"]}({msg["user_id"]})'
                             content = msg['message']
-                        content_inline = content.replace('\n', r'\n').replace('\r', r'\r')
-                        logging.info(f'{username}: {content_inline}')
-                        text = content.strip()
+                            text = content.strip()
+                        log_content = f'{username}: {content}'
+                        log_content_inline = log_content.replace('\n', r'\n').replace('\r', r'\r')
+                        logging.info(log_content_inline)
                         if text.upper().startswith('DM'):
                             show_one(text[2:].lstrip(), all_proc)
                             await asyncio.sleep(1)
@@ -71,6 +90,7 @@ async def client(apps, startswith_dm, all_proc):
             await asyncio.sleep(10)
             logging.info('reconnect')
 
+
 if __name__ == '__main__':
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
@@ -82,6 +102,7 @@ if __name__ == '__main__':
     )
 
     all_proc = []
+
     def ctrl_handler(ctrl_type):
         logging.info(f'dmhunter client v{__version__} exit')
         for p in all_proc:
@@ -89,6 +110,23 @@ if __name__ == '__main__':
         return 0
     logging.info(f'dmhunter client v{__version__} start')
     win32api.SetConsoleCtrlHandler(ctrl_handler)
+
+    try:
+        with open('templates.txt', encoding='utf-8') as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        logging.error(f'templates.txt not found')
+        show_one('未找到 templates.txt', [])
+        sys.exit()
+    except UnicodeDecodeError:
+        logging.error(f'templates unicode error')
+        show_one('templates.txt 编码错误，应使用 UTF-8', [])
+        sys.exit()
+    if len(lines) < 2:
+        logging.error(f'templates parsing error')
+        show_one('templates.txt 格式错误', [])
+        sys.exit()
+    templates = [lines[0].strip(), lines[1].strip()]
 
     apps = []
     try:
@@ -102,11 +140,11 @@ if __name__ == '__main__':
     except FileNotFoundError:
         logging.error(f'tokens.txt not found')
         show_one('未找到 tokens.txt', [])
-        exit()
+        sys.exit()
     except ValueError:
         logging.error(f'token parsing error')
         show_one('Token 格式错误', [])
-        exit()
+        sys.exit()
     try:
         asyncio.get_event_loop().run_until_complete(
             client(apps, False, all_proc)
