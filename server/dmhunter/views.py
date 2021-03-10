@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
 from Crypto.Cipher import AES
+from . import consumers
 from .helpers import *
 from .models import *
 
@@ -182,24 +183,28 @@ def mpcallback(request, id):
             reply = '指令错误'
     elif content:
         if openid_obj.joined_group:
-            message_obj.group = openid_obj.joined_group  # delayed save. save with reply at the same time
-            channel_layer = channels.layers.get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                'dmhunter_chat_{:d}'.format(openid_obj.joined_group.subscription.id),
-                {
-                    'type': 'broadcast',
-                    'message': {
-                        'type': 'chat.mp_msg',
-                        'mp_msg': {
-                            'openid': openid,
-                            'user_filled_id': openid_obj.user_filled_id,
-                            'msg_type': msg_type,
-                            'content': content,
+            group_name = 'dmhunter_chat_{:d}'.format(openid_obj.joined_group.subscription.id)
+            if consumers.group_channel_names[group_name]:
+                message_obj.group = openid_obj.joined_group  # delayed save. save with reply at the same time
+                channel_layer = channels.layers.get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    group_name,
+                    {
+                        'type': 'broadcast',
+                        'message': {
+                            'type': 'chat.mp_msg',
+                            'mp_msg': {
+                                'openid': openid,
+                                'user_filled_id': openid_obj.user_filled_id,
+                                'msg_type': msg_type,
+                                'content': content,
+                            },
                         },
-                    },
-                }
-            )
-            reply = '弹幕发射~升空！'
+                    }
+                )
+                reply = '弹幕发射~升空！'
+            else:
+                reply = '当前频道未接收弹幕'
         else:
             reply = '未加入弹幕频道'
 

@@ -2,9 +2,12 @@ import json
 
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
+from collections import defaultdict
 
 from .models import Subscription
 
+
+group_channel_names = defaultdict(set)
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
@@ -15,9 +18,10 @@ class ChatConsumer(WebsocketConsumer):
         # Leave room group
         for room_group_name in self.groups:
             async_to_sync(self.channel_layer.group_discard)(
-                self.room_group_name,
+                room_group_name,
                 self.channel_name
             )
+            group_channel_names[room_group_name].discard(self.channel_name)
 
     # Receive message from WebSocket
     def receive(self, text_data):
@@ -31,10 +35,12 @@ class ChatConsumer(WebsocketConsumer):
                 }))
         elif data['type'] == 'client.subscribe':
             assert isinstance(self.client_version, str)
+            success = len(data['apps']) > 0
             failed_apps = []
             for o in data['apps']:
                 app = Subscription.objects.filter(id=o['app_id']).first()
                 if not app or o['client_token'] != app.token:
+                    success = False
                     failed_apps.append({'app_id': o['app_id']})
                 else:
                     room_group_name = 'dmhunter_chat_{:d}'.format(app.id)
@@ -43,12 +49,14 @@ class ChatConsumer(WebsocketConsumer):
                             room_group_name,
                             self.channel_name
                         )
+                        self.groups.add(room_group_name)
+                        group_channel_names[room_group_name].add(self.channel_name)
             self.send(text_data=json.dumps({
                 'type': 'server.subscribe_result',
-                'success': not failed_apps,
+                'success': success,
                 'failed_apps': failed_apps,
             }))
-            if failed_apps:
+            if not success:
                 self.close()
         else:
             self.send(text_data=json.dumps({
@@ -75,6 +83,7 @@ class ChatConsumer_0_1_0(WebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+        group_channel_names[self.room_group_name].discard(self.channel_name)
 
     # Receive message from WebSocket
     def receive(self, text_data):
@@ -100,6 +109,7 @@ class ChatConsumer_0_1_0(WebsocketConsumer):
                     self.room_group_name,
                     self.channel_name
                 )
+                group_channel_names[self.room_group_name].add(self.channel_name)
             else:
                 self.close()
 

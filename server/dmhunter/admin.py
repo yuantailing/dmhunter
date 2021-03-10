@@ -13,6 +13,7 @@ class GhAdmin(admin.ModelAdmin):
 
 class OpenidAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'openid', 'gh', 'user_filled_id', 'joined_group', )
+    list_filter = ('gh', 'joined_group', )
 
 class SubscriptionAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'created_at', )
