@@ -1,4 +1,4 @@
-channels
+channels==2.*
 channels_redis
-django
+django==3.*
 pycryptodome
