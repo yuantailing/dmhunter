@@ -24,7 +24,7 @@ jobs:
         cd client && pyinstaller dmhunter-client.py --onefile
     - name: DM_player
       run: |
-        cmake -B dummy_dmplayer/build dummy_dmplayer -T v110
+        cmake -B dummy_dmplayer/build dummy_dmplayer
         cmake --build dummy_dmplayer/build --config Release
     - name: Copy files
       run: |
