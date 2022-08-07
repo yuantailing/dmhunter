@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import functools
 import json
 import logging
@@ -123,12 +124,18 @@ if __name__ == '__main__':
 
     all_proc = []
 
-    def ctrl_handler(ctrl_type):
+    @functools.cache
+    def clear_proc():
         logging.info(f'dmhunter client v{__version__} exit')
         for p in all_proc:
             p.terminate()
+
+    def ctrl_handler(ctrl_type):
+        clear_proc()
         return 0
+
     logging.info(f'dmhunter client v{__version__} start')
+    atexit.register(clear_proc)
     win32api.SetConsoleCtrlHandler(ctrl_handler)
 
     try:
@@ -175,7 +182,7 @@ if __name__ == '__main__':
             client(apps, False, all_proc)
         )
     except KeyboardInterrupt:
-        pass
+        raise
     except Exception as e:
         logging.error(str(e))
         raise
