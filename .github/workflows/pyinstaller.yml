@@ -22,6 +22,15 @@ jobs:
     - name: pyinstaller
       run: |
         cd client && pyinstaller dmhunter-client.py --onefile
+    - name: DM_player
+      run: |
+        cmake -B dummy_dmplayer/build dummy_dmplayer
+        cmake --build dummy_dmplayer/build --config Release
+    - name: Copy files
+      run: |
+        cp dummy_dmplayer/build/Release/DM_player.exe client/dist/
+        cp client/templates.txt.sample client/templates.txt
+        cp client/tokens.txt.sample client/tokens.txt
     - uses: actions/upload-artifact@v3
       if: success()
       with:
