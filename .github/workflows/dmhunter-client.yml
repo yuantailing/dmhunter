@@ -1,0 +1,38 @@
+name: dmhunter-client
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+    - name: Install Python dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install -U -r client/requirements.txt
+        python3 -m pip install -U pyinstaller
+    - name: pyinstaller
+      run: |
+        cd client && pyinstaller dmhunter-client.py --onefile
+    - name: DM_player
+      run: |
+        cmake -B dummy_dmplayer/build dummy_dmplayer
+        cmake --build dummy_dmplayer/build --config Release
+    - name: Copy files
+      run: |
+        cp dummy_dmplayer/build/Release/DM_player.exe client/dist/
+        cp client/templates.txt.sample client/dist/templates.txt
+        cp client/tokens.txt.sample client/dist/tokens.txt
+    - uses: actions/upload-artifact@v3
+      if: success()
+      with:
+        name: dmhunter-client
+        path: client/dist/
