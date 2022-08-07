@@ -1,4 +1,5 @@
 import json
+import pkg_resources
 
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
@@ -28,10 +29,16 @@ class ChatConsumer(WebsocketConsumer):
         data = json.loads(text_data)
         if data['type'] == 'client.version':
             self.client_version = data['version']
-            if self.client_version != '0.2.1':
+            version = pkg_resources.parse_version(self.client_version)
+            if version < pkg_resources.parse_version('0.2'):
                 self.send(text_data=json.dumps({
                     'type': 'server.alert',
                     'alert': '弹幕客户端有更新，见 https://dmhunter.tsing.net/',
+                }))
+            if version > pkg_resources.parse_version('0.2.2'):
+                self.send(text_data=json.dumps({
+                    'type': 'server.alert',
+                    'alert': '弹幕客户端版本过高',
                 }))
         elif data['type'] == 'client.subscribe':
             assert isinstance(self.client_version, str)

@@ -194,6 +194,7 @@ def mpcallback(request, id):
                         'message': {
                             'type': 'chat.mp_msg',
                             'mp_msg': {
+                                'group_name': openid_obj.joined_group.name,
                                 'openid': openid,
                                 'user_filled_id': openid_obj.user_filled_id,
                                 'msg_type': msg_type,
