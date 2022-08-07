@@ -1,4 +1,4 @@
-name: pyinstaller
+name: dmhunter-client
 
 on:
   - push
