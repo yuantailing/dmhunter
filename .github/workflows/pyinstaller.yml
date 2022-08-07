@@ -1,0 +1,28 @@
+name: pyinstaller
+
+on:
+  push:
+    branches: "*"
+  pull_request:
+    branches: "*"
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+    - name: Install Python dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install -r client/requirements.txt
+        python3 -m pip install -U pyinstaller
+    - name: pyinstaller
+      run: |
+        cd client && pyinstaller dmhunter-client.py --onefile
+    - uses: actions/upload-artifact@v2
+      if: success()
+      with:
+        path: client/dist/
