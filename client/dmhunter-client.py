@@ -184,7 +184,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         raise
     except Exception as e:
-        logging.error(str(e))
+        logging.error(f'Exception {str(e)}')
         show_one('弹幕客户端未知错误，已退出', [])
         raise
     except:
