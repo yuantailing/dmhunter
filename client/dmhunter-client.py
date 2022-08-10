@@ -21,7 +21,7 @@ def multiple_replace(dict, text):
 
 
 def show_one(text, all_proc):
-    p = subprocess.Popen(['DM_Player.exe', text])
+    p = subprocess.Popen(['DM_Player.exe', text[:998]])  # at most 998 characters
     all_proc.append(p)
     while all_proc and all_proc[0].returncode is not None:
         all_proc.pop(0)
@@ -185,4 +185,9 @@ if __name__ == '__main__':
         raise
     except Exception as e:
         logging.error(str(e))
+        show_one('弹幕客户端未知错误，已退出', [])
+        raise
+    except:
+        logging.error('Unknown exception')
+        show_one('弹幕客户端未知错误，已退出', [])
         raise
